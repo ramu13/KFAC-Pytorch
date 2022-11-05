@@ -15,7 +15,7 @@ def _extract_patches_new(x, kernel, stride, padding):
     pass
 
 
-def _extract_patches_convtp(x, kernel_size, stride, padding):
+def _extract_patches(x, kernel_size, stride, padding):
     """
     :param x: The input feature maps.  (batch_size, in_c, h, w)
     :param kernel_size: the kernel size of the conv filter (tuple of two elements)

@@ -118,6 +118,14 @@ class ComputeCovA:
     @staticmethod
     def bn2d(a, layer):
         batch_size = a.size(0)
+        # a = _extract_patches_new(a, layer.weight, layer.stride, layer.padding)
+        a = _extract_patches(a, layer.kernel_size, layer.stride, layer.padding)
+        spatial_size = a.size(1) * a.size(2)
+        a = a.view(-1, a.size(-1))
+        if layer.bias is not None:
+            a = torch.cat([a, a.new(a.size(0), 1).fill_(1)], 1)
+        a = a/spatial_size
+        # FIXME(CW): do we need to divide the output feature map's size?
         return a.t() @ (a / batch_size)
 
     # FIXME: テキトーにconv2d同じ処理ですませた

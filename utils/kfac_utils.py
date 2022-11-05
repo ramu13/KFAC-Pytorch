@@ -9,11 +9,18 @@ def try_contiguous(x):
 
     return x
 
-
-def _extract_patches_new(x, kernel, stride, padding):
-    # (FIXME): ConvTranspose の処理は別にやるべきか？
+# (FIXME): ConvTranspose の処理は別にやるべきか？
+def _extract_patches_convtp(x, kernel, stride, padding):
     pass
 
+# (FIXME): たぶんこれはいけるか
+def _extract_patches_bn(x, size):
+    """
+    :param x: The input feature tensor. (batch_size, in_c, h, w)
+    :return: (batch_size, in_c*h*w)
+    """
+    x = x.view(x.size(0), x.size(1) * x.size(2) * x.size(3))
+    return x
 
 def _extract_patches(x, kernel_size, stride, padding):
     """
@@ -104,7 +111,7 @@ class ComputeCovA:
         elif isinstance(layer, nn.Conv2d):
             cov_a = cls.conv2d(a, layer)
         elif isinstance(layer, nn.ConvTranspose2d):
-            cov_a = cls.convtp2d(a, layer)
+            cov_a = cls.conv2d(a, layer)
         elif isinstance(layer, nn.BatchNorm2d):
             cov_a = cls.bn2d(a, layer)
 
@@ -118,29 +125,13 @@ class ComputeCovA:
     @staticmethod
     def bn2d(a, layer):
         batch_size = a.size(0)
-        # a = _extract_patches_new(a, layer.weight, layer.stride, layer.padding)
-        a = _extract_patches(a, layer.kernel_size, layer.stride, layer.padding)
-        spatial_size = a.size(1) * a.size(2)
-        a = a.view(-1, a.size(-1))
-        if layer.bias is not None:
-            a = torch.cat([a, a.new(a.size(0), 1).fill_(1)], 1)
-        a = a/spatial_size
-        # FIXME(CW): do we need to divide the output feature map's size?
+        a = _extract_patches_bn(a)
         return a.t() @ (a / batch_size)
 
-    # FIXME: テキトーにconv2d同じ処理ですませた
+    # FIXME: テキトーにconv2d同じ処理ですませ
     @staticmethod
     def convtp2d(a, layer):
-        batch_size = a.size(0)
-        # a = _extract_patches_new(a, layer.weight, layer.stride, layer.padding)
-        a = _extract_patches(a, layer.kernel_size, layer.stride, layer.padding)
-        spatial_size = a.size(1) * a.size(2)
-        a = a.view(-1, a.size(-1))
-        if layer.bias is not None:
-            a = torch.cat([a, a.new(a.size(0), 1).fill_(1)], 1)
-        a = a/spatial_size
-        # FIXME(CW): do we need to divide the output feature map's size?
-        return a.t() @ (a / batch_size)
+        pass
 
     @staticmethod
     def linear(a, layer):
@@ -186,16 +177,25 @@ class ComputeCovG:
         elif isinstance(layer, nn.Linear):
             cov_g = cls.linear(g, layer, batch_averaged)
         elif isinstance(layer, nn.BatchNorm2d):
-            cov_g = cls.conv2d(g, layer, batch_averaged)
+            cov_g = cls.bn2d(g, layer, batch_averaged)
         else:
             cov_g = None
 
         return cov_g
 
+    # (FIXME): テキトーにconv2dから要らなさそうな部分を除いて、batch * (out_h * out_w) が妥当かと憶測
     @staticmethod
     def bn2d(g, layer, batch_averaged):
-        # g: batch_size * out_dim
-        pass
+        # g: batch_size * out_h * out_w
+        batch_size = g.shape[0]
+        g = try_contiguous(g)
+        g = g.view(-1, g.size(-2) * g.size(-1))
+
+        if batch_averaged:
+            g = g * batch_size
+        cov_g = g.t() @ (g / g.size(0))
+
+        return cov_g
 
     @staticmethod
     def convtp2d(g, layer, batch_averaged):
@@ -208,7 +208,7 @@ class ComputeCovG:
         # n_filters is actually the output dimension (analogous to Linear layer)
         spatial_size = g.size(2) * g.size(3)
         batch_size = g.shape[0]
-        g = g.transpose(1, 2).transpose(2, 3)
+        g = g.transpose(1, 2).transpose(2, 3) # batch_size * out_h * out_w * n_filters
         g = try_contiguous(g)
         g = g.view(-1, g.size(-1))
 

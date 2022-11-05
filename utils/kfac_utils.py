@@ -186,7 +186,7 @@ class ComputeCovG:
         elif isinstance(layer, nn.Linear):
             cov_g = cls.linear(g, layer, batch_averaged)
         elif isinstance(layer, nn.BatchNorm2d):
-            cov_g = cls.bn2d(g, layer, batch_averaged)
+            cov_g = cls.conv2d(g, layer, batch_averaged)
         else:
             cov_g = None
 
@@ -195,13 +195,7 @@ class ComputeCovG:
     @staticmethod
     def bn2d(g, layer, batch_averaged):
         # g: batch_size * out_dim
-        batch_size = g.size(0)
-
-        if batch_averaged:
-            cov_g = g.t() @ (g * batch_size)
-        else:
-            cov_g = g.t() @ (g / batch_size)
-        return cov_g
+        pass
 
     @staticmethod
     def convtp2d(g, layer, batch_averaged):

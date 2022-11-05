@@ -117,10 +117,7 @@ class ComputeCovA:
     
     @staticmethod
     def bn2d(a, layer):
-        # a: batch_size * in_dim
         batch_size = a.size(0)
-        if layer.bias is not None:
-            a = torch.cat([a, a.new(a.size(0), 1).fill_(1)], 1)
         return a.t() @ (a / batch_size)
 
     # FIXME: テキトーにconv2d同じ処理ですませた

@@ -14,7 +14,7 @@ def _extract_patches_convtp(x, kernel, stride, padding):
     pass
 
 # (FIXME): たぶんこれはいけるか
-def _extract_patches_bn(x, size):
+def _extract_patches_bn(x):
     """
     :param x: The input feature tensor. (batch_size, in_c, h, w)
     :return: (batch_size, in_c*h*w)

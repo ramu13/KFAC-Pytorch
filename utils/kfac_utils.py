@@ -10,7 +10,12 @@ def try_contiguous(x):
     return x
 
 
-def _extract_patches(x, kernel_size, stride, padding):
+def _extract_patches_new(x, kernel, stride, padding):
+    # (FIXME): ConvTranspose の処理は別にやるべきか？
+    pass
+
+
+def _extract_patches_convtp(x, kernel_size, stride, padding):
     """
     :param x: The input feature maps.  (batch_size, in_c, h, w)
     :param kernel_size: the kernel size of the conv filter (tuple of two elements)
@@ -98,12 +103,28 @@ class ComputeCovA:
             cov_a = cls.linear(a, layer)
         elif isinstance(layer, nn.Conv2d):
             cov_a = cls.conv2d(a, layer)
+        elif isinstance(layer, nn.ConvTranspose2d):
+            cov_a = cls.convtp2d(a, layer)
+
         else:
             # FIXME(CW): for extension to other layers.
             # raise NotImplementedError
             cov_a = None
 
         return cov_a
+
+    @staticmethod
+    def convtp2d(a, layer):
+        batch_size = a.size(0)
+        # a = _extract_patches_new(a, layer.weight, layer.stride, layer.padding)
+        a = _extract_patches(a, layer.kernel_size, layer.stride, layer.padding)
+        spatial_size = a.size(1) * a.size(2)
+        a = a.view(-1, a.size(-1))
+        if layer.bias is not None:
+            a = torch.cat([a, a.new(a.size(0), 1).fill_(1)], 1)
+        a = a/spatial_size
+        # FIXME(CW): do we need to divide the output feature map's size?
+        return a.t() @ (a / batch_size)
 
     @staticmethod
     def conv2d(a, layer):
@@ -143,12 +164,20 @@ class ComputeCovG:
     def __call__(cls, g, layer, batch_averaged):
         if isinstance(layer, nn.Conv2d):
             cov_g = cls.conv2d(g, layer, batch_averaged)
+        elif isinstance(layer, nn.ConvTranspose2d):
+            # cov_g = cls.convtp2d(g, layer, batch_averaged)
+            cov_g = cls.conv2d(g, layer, batch_averaged)
         elif isinstance(layer, nn.Linear):
             cov_g = cls.linear(g, layer, batch_averaged)
         else:
             cov_g = None
 
         return cov_g
+
+    @staticmethod
+    def convtp2d(g, layer, batch_averaged):
+        # (FIXME): ConvTranspose の処理は別にやるべきか
+        pass
 
     @staticmethod
     def conv2d(g, layer, batch_averaged):

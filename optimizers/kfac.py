@@ -33,7 +33,9 @@ class KFACOptimizer(optim.Optimizer):
         self.CovGHandler = ComputeCovG()
         self.batch_averaged = batch_averaged
 
-        self.known_modules = {'Linear', 'Conv2d'}
+        # ConvTranspose2d, BatchNorm2d を追加 (BNの方は特にこれといった処理はされない)
+        # _get_matrix_from_grad では Conv2d, ConvTranspose2d かそれ以外で分岐
+        self.known_modules = {'Linear', 'Conv2d', 'ConvTranspose2d', 'BatchNorm2d'}
 
         self.modules = []
         self.grad_outputs = {}
@@ -108,6 +110,8 @@ class KFACOptimizer(optim.Optimizer):
         """
         if classname == 'Conv2d':
             p_grad_mat = m.weight.grad.data.view(m.weight.grad.data.size(0), -1)  # n_filters * (in_c * kw * kh)
+        elif classname == 'ConvTranspose2d':
+            p_grad_mat = m.weight.grad.data.view(m.weight.grad.data.size(0), -1)
         else:
             p_grad_mat = m.weight.grad.data
         if m.bias is not None:

@@ -33,9 +33,9 @@ class KFACOptimizer(optim.Optimizer):
         self.CovGHandler = ComputeCovG()
         self.batch_averaged = batch_averaged
 
-        # ConvTranspose2d, BatchNorm2d を追加 (BNの方は特にこれといった処理はされない)
+        # ConvTranspose2d, BatchNorm2d, BatchNorm1d を追加 (BNの方は特にこれといった処理はされない)
         # _get_matrix_from_grad では Conv2d, ConvTranspose2d かそれ以外で分岐
-        self.known_modules = {'Linear', 'Conv2d', 'ConvTranspose2d', 'BatchNorm2d'}
+        self.known_modules = {'Linear', 'Conv2d', 'ConvTranspose2d', 'BatchNorm2d', 'BatchNorm1d'}
 
         self.modules = []
         self.grad_outputs = {}
@@ -112,8 +112,10 @@ class KFACOptimizer(optim.Optimizer):
             p_grad_mat = m.weight.grad.data.view(m.weight.grad.data.size(0), -1)  # n_filters * (in_c * kw * kh)
         elif classname == 'ConvTranspose2d':
             p_grad_mat = m.weight.grad.data.view(m.weight.grad.data.size(0), -1)
-        else:
-            p_grad_mat = m.weight.grad.data
+        elif classname == 'BatchNorm2d':
+            p_grad_mat = m.weight.grad.data.view(m.weight.grad.data.size(0), -1)
+        else: 
+            p_grad_mat = m.weight.grad.data # BatchNorm1dはLinearと同じ処理なはず
         if m.bias is not None:
             p_grad_mat = torch.cat([p_grad_mat, m.bias.grad.data.view(-1, 1)], 1)
         return p_grad_mat
@@ -193,6 +195,8 @@ class KFACOptimizer(optim.Optimizer):
             classname = m.__class__.__name__
             if self.steps % self.TInv == 0:
                 self._update_inv(m)
+            # debug
+            print("{}".classname + "error")
             p_grad_mat = self._get_matrix_form_grad(m, classname)
             v = self._get_natural_grad(m, p_grad_mat, damping)
             updates[m] = v

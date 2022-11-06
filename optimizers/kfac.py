@@ -128,9 +128,12 @@ class KFACOptimizer(optim.Optimizer):
         """
         # p_grad_mat is of output_dim * input_dim
         # inv((ss')) p_grad_mat inv(aa') = [ Q_g (1/R_g) Q_g^T ] @ p_grad_mat @ [Q_a (1/R_a) Q_a^T]
-        v1 = self.Q_g[m].t() @ p_grad_mat @ self.Q_a[m]
-        v2 = v1 / (self.d_g[m].unsqueeze(1) * self.d_a[m].unsqueeze(0) + damping)
-        v = self.Q_g[m] @ v2 @ self.Q_a[m].t()
+        v1 = self.Q_g[m].t() @ p_grad_mat
+        v1 = v1 @ self.Q_a[m]
+        temp = (self.d_g[m].unsqueeze(1) * self.d_a[m].unsqueeze(0) + damping)
+        v2 = v1 / temp
+        v = self.Q_g[m] @ v2 
+        v =  v @ self.Q_a[m].t()
         if m.bias is not None:
             # we always put gradient w.r.t weight in [0]
             # and w.r.t bias in [1]
@@ -196,7 +199,7 @@ class KFACOptimizer(optim.Optimizer):
             if self.steps % self.TInv == 0:
                 self._update_inv(m)
             # debug
-            print("{} has caused ERROR".format(classname))
+            print("Dose {} cause ERROR?".format(classname))
             p_grad_mat = self._get_matrix_form_grad(m, classname)
             v = self._get_natural_grad(m, p_grad_mat, damping)
             updates[m] = v

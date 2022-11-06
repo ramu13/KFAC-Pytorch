@@ -14,7 +14,7 @@ def _extract_patches_convtp(x, kernel, stride, padding):
     pass
 
 # (FIXME): たぶんこれはいけるか
-def _extract_patches_bn(x):
+def _extract_patches_bn2d(x):
     """
     :param x: The input feature tensor. (batch_size, in_c, h, w)
     :return: (batch_size, in_c*h*w)
@@ -114,6 +114,8 @@ class ComputeCovA:
             cov_a = cls.conv2d(a, layer)
         elif isinstance(layer, nn.BatchNorm2d):
             cov_a = cls.bn2d(a, layer)
+        elif isinstance(layer, nn.BatchNorm1d):
+            cov_a = cls.bn1d(a, layer)
 
         else:
             # FIXME(CW): for extension to other layers.
@@ -121,11 +123,20 @@ class ComputeCovA:
             cov_a = None
 
         return cov_a
+
+    # (FIXME): linearと同じ処理にしてしまったが...
+    @staticmethod
+    def bn1d(a, layer):
+         # a: batch_size * in_dim
+        batch_size = a.size(0)
+        if layer.bias is not None:
+            a = torch.cat([a, a.new(a.size(0), 1).fill_(1)], 1)
+        return a.t() @ (a / batch_size)
     
     @staticmethod
     def bn2d(a, layer):
         batch_size = a.size(0)
-        a = _extract_patches_bn(a)
+        a = _extract_patches_bn2d(a)
         return a.t() @ (a / batch_size)
 
     # FIXME: テキトーにconv2d同じ処理ですませ
@@ -178,9 +189,23 @@ class ComputeCovG:
             cov_g = cls.linear(g, layer, batch_averaged)
         elif isinstance(layer, nn.BatchNorm2d):
             cov_g = cls.bn2d(g, layer, batch_averaged)
+        elif isinstance(layer, nn.BatchNorm1d):
+            cov_g = cls.bn1d(g, layer, batch_averaged)
         else:
             cov_g = None
 
+        return cov_g
+
+    # (FIXME): Linear と同じで良いかとおもったが....
+    @staticmethod
+    def bn1d(g, layer, batch_averaged):
+        # g: batch_size * out_dim(=input_dim)
+        batch_size = g.size(0)
+
+        if batch_averaged:
+            cov_g = g.t() @ (g * batch_size)
+        else:
+            cov_g = g.t() @ (g / batch_size)
         return cov_g
 
     # (FIXME): テキトーにconv2dから要らなさそうな部分を除いて、batch * (out_h * out_w) が妥当かと憶測

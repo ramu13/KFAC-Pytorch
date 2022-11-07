@@ -202,7 +202,7 @@ class KFACOptimizer(optim.Optimizer):
             if self.steps % self.TInv == 0:
                 self._update_inv(m)
             # debug
-            print("Dose {} cause ERROR?".format(classname))
+            # print("Dose {} cause ERROR?".format(classname))
             p_grad_mat = self._get_matrix_form_grad(m, classname)
             v = self._get_natural_grad(m, p_grad_mat, damping)
             updates[m] = v

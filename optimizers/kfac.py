@@ -153,7 +153,10 @@ class KFACOptimizer(optim.Optimizer):
             vg_sum += (v[0] * m.weight.grad.data * lr ** 2).sum().item()
             if m.bias is not None:
                 vg_sum += (v[1] * m.bias.grad.data * lr ** 2).sum().item()
-        nu = min(1.0, math.sqrt(self.kl_clip / vg_sum))
+        if vg_sum == 0:
+            nu = 1.0 # 何の値かわからないが仕方なく処理
+        else:
+            nu = min(1.0, math.sqrt(self.kl_clip / vg_sum))
 
         for m in self.modules:
             v = updates[m]
